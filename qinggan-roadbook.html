@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="青甘环线7天6晚地图路书：D2住德令哈、D3抵达敦煌，含每日路线、海拔和安全绕行。">
+  <meta name="theme-color" content="#102b29">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="青甘路书">
+  <meta name="format-detection" content="telephone=no">
+  <title>青甘环线 · 7天6晚地图路书</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --ink: #17221f;
+      --muted: #69716c;
+      --paper: #f3eddf;
+      --paper-2: #e8ddc5;
+      --white: #fffdf7;
+      --night: #102b29;
+      --route: #d65d31;
+      --route-soft: #e4a16e;
+      --lake: #2d7888;
+      --safe: #43805b;
+      --warn: #c8792c;
+      --danger: #b64033;
+      --line: rgba(23, 34, 31, .16);
+      --shadow: 0 24px 70px rgba(23, 34, 31, .2);
+      --display: "STKaiti", "FZKai-Z03", "KaiTi", serif;
+      --body: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    html, body { min-height: 100%; }
+    body { margin: 0; overflow-x: hidden; color: var(--ink); background: var(--paper); font-family: var(--body); }
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .app { height: min(860px, 88vh); min-height: 700px; position: relative; isolation: isolate; }
+    #map { position: absolute; inset: 0; background: #cbd5cc; }
+    #mapFallback {
+      position: absolute; inset: 0; display: none; place-items: center; padding: 30px; text-align: center;
+      color: var(--white); background:
+        repeating-linear-gradient(25deg, transparent 0 45px, rgba(255,255,255,.05) 46px 47px),
+        linear-gradient(135deg, #335453, #1c3836);
+    }
+    #mapFallback strong { display: block; font-family: var(--display); font-size: 30px; }
+    .leaflet-tile-pane { filter: saturate(.82) contrast(.99) brightness(1.03); }
+    .leaflet-control-zoom { border: 0 !important; box-shadow: var(--shadow) !important; }
+    .leaflet-control-zoom a { color: var(--ink) !important; background: rgba(255,253,247,.94) !important; }
+    .leaflet-control-attribution { background: rgba(255,253,247,.8) !important; font-size: 10px !important; }
+    .leaflet-popup-content-wrapper { border-radius: 4px; box-shadow: var(--shadow); background: var(--white); }
+    .leaflet-popup-tip { background: var(--white); }
+    .leaflet-popup-content { margin: 14px 16px; min-width: 150px; }
+    .popup-title { font-weight: 800; }
+    .popup-meta { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+    .topbar {
+      position: absolute; z-index: 800; top: max(18px, env(safe-area-inset-top)); left: 20px; right: 20px;
+      min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 10px 13px 10px 19px; color: var(--white); background: rgba(16,43,41,.96);
+      box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(16px);
+    }
+    .title-wrap { display: flex; align-items: baseline; gap: 15px; min-width: 0; }
+    h1 { margin: 0; font-family: var(--display); font-size: 27px; line-height: 1; white-space: nowrap; }
+    .date { color: rgba(255,255,255,.62); font-size: 12px; letter-spacing: .08em; white-space: nowrap; }
+    .stats { display: flex; gap: 8px; margin-left: auto; }
+    .stat { padding: 7px 11px; border-left: 1px solid rgba(255,255,255,.18); white-space: nowrap; }
+    .stat strong { display: block; font-size: 13px; }
+    .stat span { display: block; color: rgba(255,255,255,.56); font-size: 10px; }
+    .top-actions { display: flex; gap: 7px; }
+    .top-btn {
+      min-height: 38px; padding: 8px 12px; border: 1px solid rgba(255,255,255,.28); border-radius: 999px;
+      color: var(--white); background: transparent; cursor: pointer; white-space: nowrap;
+    }
+    .top-btn:hover { background: rgba(255,255,255,.1); }
+    .connection-state {
+      position: fixed; z-index: 1200; left: 50%; bottom: max(14px, env(safe-area-inset-bottom));
+      translate: -50% 18px; padding: 8px 12px; border-radius: 999px; opacity: 0; pointer-events: none;
+      color: var(--white); background: rgba(16,43,41,.94); box-shadow: 0 8px 26px rgba(16,43,41,.25);
+      font-size: 11px; font-weight: 800; transition: opacity .2s ease, translate .2s ease;
+    }
+    .connection-state.visible { opacity: 1; translate: -50% 0; }
+    .connection-state.offline { background: rgba(182,64,51,.96); }
+
+    .planner {
+      position: absolute; z-index: 700; left: 20px; top: 96px; bottom: 20px; width: 370px;
+      display: flex; flex-direction: column; overflow: hidden; background: rgba(255,253,247,.97);
+      box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.55); backdrop-filter: blur(18px);
+    }
+    .planner-head { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); }
+    .planner-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .planner-head h2 { margin: 0; font-family: var(--display); font-size: 25px; }
+    .all-btn { border: 0; color: var(--lake); background: transparent; cursor: pointer; font-weight: 800; font-size: 12px; }
+    .day-tabs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 12px; }
+    .day-tab {
+      height: 33px; padding: 0; border: 1px solid var(--line); border-radius: 3px;
+      color: var(--muted); background: transparent; cursor: pointer; font-size: 11px; font-weight: 800;
+    }
+    .day-tab:hover { border-color: var(--route); }
+    .day-tab.active { color: white; border-color: var(--route); background: var(--route); }
+
+    .day-detail { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; scrollbar-width: thin; }
+    .detail-date { color: var(--route); font-size: 11px; font-weight: 900; letter-spacing: .12em; }
+    .detail-title { margin: 5px 0 13px; font-family: var(--display); font-size: 30px; line-height: 1.08; }
+    .meta-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-bottom: 17px; background: var(--line); border: 1px solid var(--line); }
+    .meta { padding: 10px; background: var(--paper); }
+    .meta strong { display: block; font-size: 13px; }
+    .meta span { display: block; color: var(--muted); font-size: 10px; }
+    .risk-low { color: var(--safe); }
+    .risk-mid { color: var(--warn); }
+    .risk-high { color: var(--danger); }
+
+    .schedule { margin: 0; padding: 0; list-style: none; }
+    .schedule li { display: grid; grid-template-columns: 46px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .schedule time { color: var(--muted); font-size: 11px; font-weight: 800; }
+    .drive-note { margin-top: 15px; padding: 13px 14px; color: var(--white); background: var(--night); font-size: 12px; }
+    .drive-note strong { color: #f1c17b; }
+    .brief-warning { margin-top: 10px; color: var(--danger); font-size: 11px; font-weight: 800; }
+    .detail-jump {
+      width: 100%; margin-top: 14px; padding: 11px 13px; border: 1px solid var(--ink); border-radius: 2px;
+      color: var(--ink); background: transparent; cursor: pointer; font-size: 12px; font-weight: 900;
+    }
+    .detail-jump:hover { color: var(--white); background: var(--ink); }
+
+    .planner-foot { border-top: 1px solid var(--line); padding: 11px 17px; color: var(--muted); background: var(--paper); font-size: 10px; }
+    .planner-foot strong { color: var(--danger); }
+
+    .map-tools {
+      position: absolute; z-index: 700; right: 20px; top: 96px; display: grid; gap: 8px;
+      padding: 10px; background: rgba(255,253,247,.94); box-shadow: var(--shadow); backdrop-filter: blur(12px);
+    }
+    .tool-check { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+    .tool-check input { accent-color: var(--route); }
+
+    .legend {
+      position: absolute; z-index: 700; right: 20px; bottom: 32px; width: 190px;
+      padding: 12px 14px; background: rgba(255,253,247,.94); box-shadow: var(--shadow); font-size: 11px;
+    }
+    .legend strong { display: block; margin-bottom: 7px; }
+    .legend-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; color: var(--muted); }
+    .legend-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); line-height: 1.45; }
+    .line-key { width: 27px; height: 4px; background: var(--route); }
+    .dot-key { width: 12px; height: 12px; border-radius: 50%; background: var(--night); border: 3px solid var(--white); box-shadow: 0 0 0 1px var(--night); }
+    .tri-key { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 13px solid var(--danger); }
+
+    .day-marker, .alt-marker, .hazard-marker, .attraction-marker, .distance-marker { background: transparent; border: 0; }
+    .day-pin {
+      width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%;
+      color: white; background: var(--night); border: 3px solid var(--white); box-shadow: 0 5px 14px rgba(0,0,0,.3);
+      font-size: 11px; font-weight: 900;
+    }
+    .day-pin.active { background: var(--route); transform: scale(1.15); }
+    .alt-pin {
+      padding: 3px 6px; border-radius: 2px; color: var(--white); background: rgba(45,120,136,.92);
+      border: 1px solid rgba(255,255,255,.8); box-shadow: 0 4px 10px rgba(0,0,0,.18); white-space: nowrap;
+      font-size: 10px; font-weight: 800;
+    }
+    .hazard-pin {
+      width: 0; height: 0; border-left: 11px solid transparent; border-right: 11px solid transparent;
+      border-bottom: 20px solid var(--danger); filter: drop-shadow(0 4px 5px rgba(0,0,0,.25)); position: relative;
+    }
+    .hazard-pin::after { content: "!"; position: absolute; left: -2px; top: 5px; color: white; font-size: 10px; font-weight: 900; }
+    .attraction-pin {
+      display: flex; align-items: center; width: max-content; max-width: 145px; padding: 4px 7px 4px 5px;
+      color: var(--ink); background: rgba(255,253,247,.96); border: 1px solid rgba(23,34,31,.23);
+      box-shadow: 0 4px 12px rgba(23,34,31,.18); font-size: 10px; font-weight: 900; white-space: nowrap;
+    }
+    .attraction-pin::before {
+      content: "◆"; margin-right: 5px; color: var(--route); font-size: 8px;
+    }
+    .distance-pin {
+      width: max-content; padding: 3px 7px; color: var(--white); background: rgba(45,120,136,.94);
+      border: 1px solid rgba(255,255,255,.9); border-radius: 999px; box-shadow: 0 3px 9px rgba(23,34,31,.2);
+      font-size: 9px; font-weight: 900; line-height: 1; white-space: nowrap;
+    }
+
+    .leaflet-control-zoom { margin-top: 96px !important; margin-right: 20px !important; }
+
+    .roadbook {
+      position: relative; padding: 82px max(24px, calc((100vw - 1180px) / 2)) 96px;
+      background:
+        radial-gradient(circle at 8% 8%, rgba(45,120,136,.1), transparent 26%),
+        linear-gradient(180deg, var(--paper) 0%, #f7f2e8 100%);
+    }
+    .roadbook::before { content: ""; position: absolute; inset: 0 0 auto; height: 1px; background: var(--line); }
+    .roadbook-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; margin-bottom: 36px; }
+    .eyebrow { color: var(--route); font-size: 11px; font-weight: 900; letter-spacing: .16em; }
+    .roadbook h2 { margin: 7px 0 0; font-family: var(--display); font-size: clamp(36px, 5vw, 66px); font-weight: 700; line-height: 1; }
+    .roadbook-intro { max-width: 410px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
+    .roadbook-days { display: grid; gap: 18px; }
+    .road-day {
+      display: grid; grid-template-columns: 150px minmax(0, 1fr); overflow: hidden;
+      border: 1px solid rgba(23,34,31,.18); background: rgba(255,253,247,.82); box-shadow: 0 12px 36px rgba(23,34,31,.08);
+      scroll-margin-top: 24px;
+    }
+    .road-day-label { padding: 24px 20px; color: var(--white); background: var(--night); }
+    .road-day-label b { display: block; font-family: var(--display); font-size: 48px; line-height: .95; }
+    .road-day-label time { display: block; margin-top: 10px; color: rgba(255,255,255,.62); font-size: 11px; letter-spacing: .08em; }
+    .road-day-label span { display: block; margin-top: 30px; color: #f1c17b; font-size: 11px; font-weight: 800; }
+    .road-day-body { padding: 24px 26px 27px; }
+    .road-day-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .road-day-title h3 { margin: 0; font-family: var(--display); font-size: 29px; line-height: 1.12; }
+    .road-day-summary { flex: 0 0 auto; color: var(--muted); font-size: 11px; text-align: right; line-height: 1.55; }
+    .road-day-summary strong { display: block; color: var(--ink); font-size: 14px; }
+    .road-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(250px, .65fr); gap: 28px; margin-top: 20px; }
+    .section-label { margin: 0 0 10px; color: var(--route); font-size: 10px; font-weight: 900; letter-spacing: .13em; }
+    .segment-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .segment-table th { padding: 0 9px 7px; color: var(--muted); font-size: 10px; font-weight: 700; text-align: left; }
+    .segment-table th:nth-child(n+2), .segment-table td:nth-child(n+2) { text-align: right; white-space: nowrap; }
+    .segment-table td { padding: 9px; border-top: 1px solid var(--line); }
+    .segment-table td:first-child { font-weight: 700; }
+    .spot-list { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+    .spot { padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--white); font-size: 11px; }
+    .spot.must { color: var(--lake); border-color: rgba(45,120,136,.35); background: rgba(45,120,136,.07); font-weight: 800; }
+    .hotel-card { padding: 13px 14px; border-left: 3px solid var(--route); background: var(--paper); }
+    .hotel-card strong { display: block; font-size: 13px; }
+    .hotel-card span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .hotel-card a { color: var(--lake); text-decoration: none; }
+    .roadbook-note { margin: 24px 0 0; padding: 16px 18px; color: var(--muted); border: 1px solid var(--line); font-size: 11px; line-height: 1.65; }
+    .roadbook-note strong { color: var(--ink); }
+    .roadbook-note a { color: var(--lake); }
+
+    @media (max-width: 850px) {
+      .app { height: auto; min-height: 100%; display: grid; grid-template-rows: 58vh auto; }
+      #map { position: relative; inset: auto; grid-row: 1; min-height: 430px; }
+      #mapFallback { position: absolute; inset: 0 0 auto; height: 58vh; min-height: 430px; }
+      .topbar { position: absolute; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); min-height: 52px; padding: 9px 12px; }
+      h1 { font-size: 22px; }
+      .date { display: none; }
+      .stats { display: none; }
+      .top-btn:first-child { display: none; }
+      .top-btn { min-height: 33px; padding: 6px 9px; font-size: 11px; }
+      .planner { position: relative; inset: auto; width: auto; height: auto; min-height: 510px; grid-row: 2; box-shadow: none; border: 0; }
+      .planner-head { position: sticky; top: 0; z-index: 4; background: var(--white); }
+      .day-detail { overflow: visible; }
+      .map-tools { top: 74px; right: 10px; }
+      .legend { display: none; }
+      .leaflet-control-zoom { margin-top: 148px !important; margin-right: 10px !important; }
+      .roadbook { padding: 58px max(16px, env(safe-area-inset-right)) max(72px, calc(52px + env(safe-area-inset-bottom))) max(16px, env(safe-area-inset-left)); }
+      .roadbook-head { grid-template-columns: 1fr; margin-bottom: 26px; }
+      .roadbook-intro { max-width: none; }
+      .road-day { grid-template-columns: 76px minmax(0, 1fr); }
+      .road-day-label { padding: 20px 12px; }
+      .road-day-label b { font-size: 34px; }
+      .road-day-label span { margin-top: 20px; writing-mode: vertical-rl; }
+      .road-day-body { padding: 20px 16px 23px; }
+      .road-day-title { display: block; }
+      .road-day-title h3 { font-size: 24px; }
+      .road-day-summary { margin-top: 8px; text-align: left; }
+      .road-day-summary strong { display: inline; margin-right: 7px; }
+      .road-grid { grid-template-columns: 1fr; gap: 22px; }
+    }
+
+    @media (max-width: 430px) {
+      .app { grid-template-rows: 52vh auto; }
+      #map { min-height: 390px; }
+      #mapFallback { height: 52vh; min-height: 390px; }
+      .title-wrap { gap: 0; }
+      h1 { font-size: 20px; }
+      .top-actions { margin-left: auto; }
+      .day-tabs { gap: 3px; }
+      .day-tab { font-size: 10px; }
+      .planner-head, .day-detail { padding-left: 14px; padding-right: 14px; }
+      .map-tools { padding: 8px; }
+      .tool-check { font-size: 10px; }
+      .attraction-pin { max-width: 112px; padding: 3px 5px; font-size: 9px; }
+      .distance-pin { padding: 3px 5px; font-size: 8px; }
+      .roadbook { padding-left: 10px; padding-right: 10px; }
+      .road-day { grid-template-columns: 1fr; }
+      .road-day-label { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; }
+      .road-day-label b { font-size: 28px; }
+      .road-day-label time { margin: 0; }
+      .road-day-label span { margin: 0; writing-mode: horizontal-tb; }
+      .road-day-body { padding: 18px 13px 21px; }
+      .segment-table { font-size: 11px; }
+      .segment-table th, .segment-table td { padding-left: 5px; padding-right: 5px; }
+    }
+
+    @media print {
+      body { overflow: visible; }
+      .app { height: 100vh; }
+      .top-actions, .map-tools { display: none; }
+      .topbar { box-shadow: none; }
+      .planner { box-shadow: none; }
+      .roadbook { break-before: page; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div id="map" aria-label="青甘环线交互地图"></div>
+    <div id="mapFallback"><div><strong>地图底图未加载</strong>请联网后刷新页面；下方7天6晚行程仍可正常查看。</div></div>
+
+    <header class="topbar">
+      <div class="title-wrap"><h1>青甘环线地图路书</h1><span class="date">2026.08.30 — 09.05 · 7 DAYS / 6 NIGHTS</span></div>
+      <div class="stats">
+        <div class="stat"><strong>≈2,300 km</strong><span>西北租车里程</span></div>
+        <div class="stat"><strong>≈3,800 m</strong><span>最高点</span></div>
+        <div class="stat"><strong>4 天</strong><span>长途驾驶日</span></div>
+      </div>
+      <div class="top-actions">
+        <button class="top-btn" type="button" id="fitRoute">全程路线</button>
+        <button class="top-btn" type="button" id="openRoadbook">详细路书 ↓</button>
+        <button class="top-btn" type="button" onclick="window.print()">打印</button>
+      </div>
+    </header>
+
+    <aside class="planner" aria-label="7天6晚行程">
+      <div class="planner-head">
+        <div class="planner-head-row"><h2>7天6晚</h2><button class="all-btn" type="button" id="showAll">查看全程</button></div>
+        <div class="day-tabs" id="dayTabs"></div>
+      </div>
+      <div class="day-detail" id="dayDetail" aria-live="polite"></div>
+      <div class="planner-foot"><strong>驾驶限制：</strong>B/C仅在A持证满3年且坐副驾时可驾驶高速；橡皮山、当金山、G213/S302山路全部由A驾驶。</div>
+    </aside>
+
+    <div class="map-tools" aria-label="地图图层">
+      <label class="tool-check"><input type="checkbox" id="attractionToggle" checked> 景区</label>
+      <label class="tool-check"><input type="checkbox" id="distanceToggle" checked> 公里数</label>
+      <label class="tool-check"><input type="checkbox" id="hazardToggle" checked> 危险点</label>
+      <label class="tool-check"><input type="checkbox" id="altToggle"> 海拔</label>
+    </div>
+
+    <div class="legend">
+      <strong>地图标记</strong>
+      <div class="legend-row"><i class="line-key"></i> 计划路线</div>
+      <div class="legend-row"><span style="color:var(--route)">◆</span> 途经景区</div>
+      <div class="legend-row"><span class="distance-pin">105km</span> 路段里程</div>
+      <div class="legend-row"><i class="dot-key"></i> 每日住宿点</div>
+      <div class="legend-row"><i class="tri-key"></i> 主驾接管路段</div>
+      <div class="legend-note">地图为规划示意，实际转向与距离以出发当天导航为准。</div>
+    </div>
+  </main>
+
+  <section class="roadbook" id="roadbook" aria-labelledby="roadbookTitle">
+    <div class="roadbook-head">
+      <div>
+        <div class="eyebrow">DAY BY DAY · 下拉路书</div>
+        <h2 id="roadbookTitle">7天6晚逐段行程</h2>
+      </div>
+      <p class="roadbook-intro">每段里程和时间均为规划估算，不含景区游览、吃饭和堵车。出发当天再用高德或百度复核，并下载青海、甘肃离线地图。</p>
+    </div>
+    <div class="roadbook-days" id="roadbookDays"></div>
+    <p class="roadbook-note"><strong>三人住店：</strong>下单前确认房型明确允许3位成人入住；有三人间/家庭房就选，没有就订“双床＋单人”两间，勿默认挤住。勾选免费停车、免费取消；暑期房态和价格以预订平台当日显示为准。</p>
+  </section>
+
+  <div class="connection-state" id="connectionState" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (() => {
+      const days = [
+        {
+          day: 1, date: '8月30日', title: '舟山 → 宁波 → 西宁', km: '当地142 km', drive: '2.5–3小时', sleep: '西宁 2,260m', max: '2,260m', risk: '低', riskClass: 'low',
+          route: [[36.528,102.043],[36.617,101.778]], stay: [36.617,101.778],
+          segments: [['舟山市区 → 宁波栎社机场','≈97 km','1小时30分–2小时'],['西宁曹家堡机场 → 海湖新区','≈45 km','约55分钟']],
+          sights: [{name:'西宁｜市区采购',must:true},{name:'西宁｜唐道637（有体力再去）',must:false}],
+          hotel: {name:'西宁海湖新区国投广场亚朵S酒店', note:'落地后只验车和补给；优先家庭房，否则订2间。', url:'https://hotels.corporatetravel.ctrip.com/hotels/95735558.html'},
+          schedule: [['中午','舟山出发，前往宁波机场'],['19:55','抵达西宁，录像验车'],['21:00','入住海湖新区，尽早休息']],
+          driver: 'A驾驶机场至酒店；B/C不在夜间和陌生城区练车。', warning: '西宁海拔约2,260m，落地后不饮酒。'
+        },
+        {
+          day: 2, date: '8月31日', title: '西宁 → 青海湖 → 茶卡 → 德令哈', km: '约500 km', drive: '7–7.5小时', sleep: '德令哈 2,980m', max: '≈3,800m', risk: '高', riskClass: 'high',
+          route: [[36.617,101.778],[36.43,101.04],[36.59,100.24],[36.72,99.80],[36.65,99.55],[36.71,99.08],[36.93,98.48],[37.37,97.37]], stay: [37.37,97.37],
+          segments: [['西宁 → 青海湖黑马河','≈210 km','3–3.5小时'],['黑马河 → 茶卡盐湖','≈85 km','约1.5小时'],['茶卡 → 德令哈','≈200 km','约2.5小时']],
+          sights: [{name:'海南州·青海湖｜黑马河',must:true},{name:'海西州·茶卡｜天空之镜',must:true},{name:'橡皮山口 ≈3,800m',must:false}],
+          hotel: {name:'德令哈美豪R酒店 / 同级可取消酒店', note:'D2终点只住宿补给；不再追加可鲁克湖。', url:''},
+          schedule: [['06:30','西宁出发'],['10:00','黑马河短游60–75分钟'],['13:15','茶卡盐湖，最多2.5小时'],['16:00','前往德令哈，约19:00入住']],
+          driver: '全天由A主驾；橡皮山和傍晚路段不交给新手。', warning: '13:30后才入茶卡则压缩至90分钟；18:00仍在茶卡则取消景区。'
+        },
+        {
+          day: 3, date: '9月1日', title: '德令哈 → 大柴旦翡翠湖 → 敦煌', km: '约550 km', drive: '7–7.5小时', sleep: '敦煌 1,140m', max: '≈3,650m', risk: '高', riskClass: 'high',
+          route: [[37.37,97.37],[37.62,96.42],[37.85,95.36],[37.84,95.26],[37.52,95.53],[38.23,94.10],[39.63,94.34],[40.14,94.66]], stay: [40.14,94.66],
+          segments: [['德令哈 → 大柴旦镇','≈210 km','2.5–3小时'],['镇区 ↔ 翡翠湖','≈30 km','约50分钟'],['大柴旦 → 当金山 → 敦煌','≈340–360 km','4.5–5小时']],
+          sights: [{name:'海西州·大柴旦｜翡翠湖',must:true},{name:'当金山口 ≈3,650m',must:false},{name:'敦煌｜沙洲夜市',must:false}],
+          hotel: {name:'全季酒店（敦煌夜市市政府店）', note:'连住2晚；避免D4再次搬行李，步行可到夜市。', url:'https://hotels.ctrip.com/hotels/123779875.html'},
+          schedule: [['06:30','德令哈出发并加满油'],['09:30','翡翠湖，阴雨时取消'],['12:30','必须离开大柴旦镇'],['18:30','抵达敦煌，体力允许再逛夜市']],
+          driver: '当金山、隧道和长下坡全部由A驾驶，使用低挡控速。', warning: '13:00仍未离开大柴旦时取消所有午后停留。'
+        },
+        {
+          day: 4, date: '9月2日', title: '敦煌一日', km: '市内约50 km', drive: '当地短途', sleep: '敦煌 1,140m', max: '1,200m', risk: '低', riskClass: 'low',
+          route: [[40.14,94.66],[40.04,94.81],[40.14,94.66],[40.04,94.68],[40.14,94.66]], stay: [40.14,94.66],
+          segments: [['酒店 → 莫高窟数字展示中心','≈12 km','约20分钟'],['数字中心 → 酒店 / 博物馆','≈20–25 km','30–35分钟'],['市区 ↔ 鸣沙山月牙泉','≈14 km','约40分钟']],
+          sights: [{name:'敦煌｜莫高窟',must:true},{name:'敦煌｜鸣沙山·月牙泉',must:true},{name:'敦煌｜博物馆',must:false}],
+          hotel: {name:'续住：全季酒店（敦煌夜市市政府店）', note:'当天不跑玉门关、阳关，给主驾完整恢复。', url:'https://hotels.ctrip.com/hotels/123779875.html'},
+          schedule: [['上午','莫高窟，提前30分钟到'],['下午','回酒店休息或敦煌博物馆'],['17:30','鸣沙山月牙泉看日落']],
+          driver: '仅当地短途，也可全员打车休整。', warning: '莫高窟只通过官方渠道购票。'
+        },
+        {
+          day: 5, date: '9月3日', title: '敦煌 → 瓜州 → 七彩丹霞', km: '约590 km', drive: '6.5–7小时', sleep: '七彩丹霞 1,850m', max: '≈1,850m', risk: '高', riskClass: 'high',
+          route: [[40.14,94.66],[40.53,95.78],[40.28,97.05],[39.77,98.29],[39.38,99.50],[38.97,100.07]], stay: [38.97,100.07],
+          segments: [['敦煌 → 瓜州','≈115 km','约1.5小时'],['瓜州 → 嘉峪关','≈255 km','2.5–3小时'],['嘉峪关 → 七彩丹霞','≈220–250 km','2.5–3小时']],
+          sights: [{name:'瓜州｜雕塑选一处',must:false},{name:'嘉峪关｜仅补给',must:false},{name:'张掖·临泽｜七彩丹霞',must:true}],
+          hotel: {name:'七彩丹霞北门 / 七彩镇附近酒店', note:'游览后直接住宿，不再夜间赶张掖市区。', url:''},
+          schedule: [['06:30','敦煌出发'],['中午','嘉峪关只午餐、加油'],['14:30','抵达七彩丹霞，游览至傍晚'],['晚上','住景区附近，为D6早出发']],
+          driver: 'A负责侧风段；B/C仅在天气良好的直线高速短时轮换。', warning: '不进嘉峪关关城；瓜州雕塑最多停20分钟。'
+        },
+        {
+          day: 6, date: '9月4日', title: '七彩丹霞 → 肃南 → 祁连 → 西宁', km: '约500 km', drive: '8.5–9小时', sleep: '西宁 2,260m', max: '≈3,640m', risk: '高', riskClass: 'high',
+          route: [[38.97,100.07],[38.84,99.61],[38.54,99.16],[38.18,100.25],[37.95,100.92],[37.38,101.61],[36.90,101.68],[36.62,101.78]], stay: [36.62,101.78],
+          segments: [['七彩丹霞 → 肃南县城','≈65–75 km','约1小时20分'],['肃南 → 野牛沟 → 祁连县','≈152 km','3–3.5小时'],['祁连县 → 峨堡收费站','≈74 km','约1小时15分'],['峨堡 → G0611 → 西宁','≈207 km','约3小时']],
+          sights: [{name:'肃南｜祁连山9号公路',must:true},{name:'祁连｜沿途草原',must:false},{name:'峨堡｜转入G0611',must:false}],
+          hotel: {name:'西宁海湖新区国投广场亚朵S酒店', note:'回到熟悉酒店；次日还车路线简单。', url:'https://hotels.corporatetravel.ctrip.com/hotels/95735558.html'},
+          schedule: [['07:00','丹霞附近出发并加满油'],['12:00','祁连县午餐、加油、休息'],['14:20','峨堡收费站转G0611'],['18:30','抵达西宁']],
+          driver: 'G213、S302山路全部由A驾驶；B/C当天不驾驶山区。', warning: '不设民乐、扁都口为途经点，不进入老G227或施工便道。'
+        },
+        {
+          day: 7, date: '9月5日', title: '西宁 → 塔尔寺或市区 → 返程', km: '100–130 km', drive: '2–3小时', sleep: '返程', max: '2,670m', risk: '低', riskClass: 'low',
+          route: [[36.62,101.78],[36.48,101.57],[36.53,102.04]], stay: [36.53,102.04],
+          segments: [['海湖新区 → 塔尔寺','≈30 km','约45分钟'],['塔尔寺 → 曹家堡机场','≈60 km','约1小时'],['宁波机场 → 舟山市区','≈97 km','约1小时20分']],
+          sights: [{name:'西宁·湟中｜塔尔寺（晚班机）',must:true},{name:'西宁｜市区采购（早班机）',must:false}],
+          hotel: {name:'无需住宿 · 当天返程', note:'航班早于17:00则取消塔尔寺；落地后疲劳时住宁波机场附近。', url:''},
+          schedule: [['07:30','晚班机可前往塔尔寺'],['11:30','结束游览并午餐'],['起飞前3小时','到机场加油、还车'],['返程','飞浙江后返回舟山']],
+          driver: 'A驾驶酒店至景点和机场；B/C负责票据、行李与车况核对。', warning: '只有19:00后起飞的航班才安排塔尔寺。'
+        }
+      ];
+
+      const hazards = [
+        {day:2, name:'橡皮山', alt:'≈3,800m', note:'连续坡道 · A驾驶', pos:[36.65,99.55]},
+        {day:3, name:'当金山', alt:'≈3,650m', note:'长下坡 · 低挡控速', pos:[38.23,94.10]},
+        {day:6, name:'G213 东山隧道', alt:'≈3,640m', note:'高海拔山路 · A驾驶', pos:[38.45,99.40]},
+        {day:6, name:'祁连—峨堡 S302', alt:'3,000m+', note:'弯道与牲畜 · 禁走老G227', pos:[38.02,100.61]}
+      ];
+
+      const altitudes = [
+        {name:'西宁', alt:'2,260m', pos:[36.62,101.78]},
+        {name:'青海湖', alt:'3,200m', pos:[36.72,99.80]},
+        {name:'茶卡', alt:'3,060m', pos:[36.71,99.08]},
+        {name:'德令哈', alt:'2,980m', pos:[37.37,97.37]},
+        {name:'大柴旦', alt:'3,170m', pos:[37.85,95.36]},
+        {name:'敦煌', alt:'1,140m', pos:[40.14,94.66]},
+        {name:'七彩丹霞', alt:'1,850m', pos:[38.97,100.07]},
+        {name:'祁连', alt:'2,780m', pos:[38.18,100.25]},
+        {name:'峨堡', alt:'3,400m', pos:[37.95,100.92]}
+      ];
+
+      const attractions = [
+        {day:2, name:'青海湖·黑马河', pos:[36.72,99.80], key:true},
+        {day:2, name:'茶卡盐湖', pos:[36.71,99.08], key:true},
+        {day:3, name:'大柴旦翡翠湖', pos:[37.84,95.26], anchor:[120,12], key:true},
+        {day:4, name:'莫高窟', pos:[40.04,94.81], key:true},
+        {day:4, name:'鸣沙山月牙泉', pos:[40.04,94.68], anchor:[120,-3], key:true},
+        {day:5, name:'瓜州·雕塑选一处', pos:[40.52,95.78]},
+        {day:5, name:'七彩丹霞', pos:[38.97,100.07], key:true},
+        {day:6, name:'祁连山9号公路', pos:[38.55,99.17], key:true},
+        {day:6, name:'祁连沿途草原', pos:[38.18,100.25]},
+        {day:7, name:'塔尔寺', pos:[36.48,101.57], key:true}
+      ];
+
+      const segmentLabels = [
+        {day:1, label:'45km', pos:[36.57,101.91]},
+        {day:2, label:'210km', pos:[36.54,100.58]}, {day:2, label:'85km', pos:[36.70,99.43]}, {day:2, label:'200km', pos:[37.04,98.18]},
+        {day:3, label:'210km', pos:[37.60,96.25]}, {day:3, label:'350km', pos:[38.85,94.25]},
+        {day:4, label:'市内50km', pos:[40.08,94.75]},
+        {day:5, label:'115km', pos:[40.31,95.28]}, {day:5, label:'255km', pos:[40.20,96.90]}, {day:5, label:'235km', pos:[39.36,99.26]},
+        {day:6, label:'70km', pos:[38.91,99.82]}, {day:6, label:'152km', pos:[38.48,99.65]}, {day:6, label:'74km', pos:[38.05,100.58]}, {day:6, label:'207km', pos:[37.24,101.67]},
+        {day:7, label:'30km', pos:[36.55,101.67]}, {day:7, label:'60km', pos:[36.51,101.82]}
+      ];
+
+      const dayDistanceLabels = [
+        {day:1, label:'D1 · 当地142km', pos:[36.57,101.91]},
+        {day:2, label:'D2 · 500km', pos:[36.86,99.06]},
+        {day:3, label:'D3 · 550km', pos:[38.86,94.31]},
+        {day:4, label:'D4 · 市内50km', pos:[40.08,94.75]},
+        {day:5, label:'D5 · 590km', pos:[39.82,97.15]},
+        {day:6, label:'D6 · 500km', pos:[37.40,101.45]},
+        {day:7, label:'D7 · 100–130km', pos:[36.52,101.82]}
+      ];
+
+      const detail = document.getElementById('dayDetail');
+      const tabs = document.getElementById('dayTabs');
+      const fallback = document.getElementById('mapFallback');
+      const roadbookDays = document.getElementById('roadbookDays');
+      const connectionState = document.getElementById('connectionState');
+
+      function showConnectionState(message, offline = false) {
+        connectionState.textContent = message;
+        connectionState.classList.toggle('offline', offline);
+        connectionState.classList.add('visible');
+        window.clearTimeout(showConnectionState.timer);
+        showConnectionState.timer = window.setTimeout(() => connectionState.classList.remove('visible'), 3200);
+      }
+
+      window.addEventListener('offline', () => showConnectionState('当前离线 · 路书仍可查看', true));
+      window.addEventListener('online', () => showConnectionState('网络已恢复'));
+      if (!navigator.onLine) window.setTimeout(() => showConnectionState('当前离线 · 路书仍可查看', true), 600);
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(() => {
+            showConnectionState('离线功能初始化失败，请联网刷新', true);
+          });
+        });
+      }
+
+      days.forEach(d => {
+        const btn = document.createElement('button');
+        btn.className = 'day-tab'; btn.type = 'button'; btn.textContent = `D${d.day}`;
+        btn.setAttribute('aria-label', `查看第${d.day}天路线`);
+        btn.addEventListener('click', () => selectDay(d.day));
+        tabs.appendChild(btn);
+      });
+
+      roadbookDays.innerHTML = days.map(d => `
+        <article class="road-day" id="road-day-${d.day}">
+          <div class="road-day-label">
+            <b>D${d.day}</b>
+            <time>${d.date}</time>
+            <span class="risk-${d.riskClass}">${d.risk}风险</span>
+          </div>
+          <div class="road-day-body">
+            <div class="road-day-title">
+              <h3>${d.title}</h3>
+              <div class="road-day-summary"><strong>${d.km} · ${d.drive}</strong>最高海拔 ${d.max}</div>
+            </div>
+            <div class="road-grid">
+              <div>
+                <p class="section-label">逐段驾驶</p>
+                <table class="segment-table">
+                  <thead><tr><th>路段</th><th>长度</th><th>预计驾驶</th></tr></thead>
+                  <tbody>${d.segments.map(s => `<tr><td>${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td></tr>`).join('')}</tbody>
+                </table>
+              </div>
+              <div>
+                <p class="section-label">途经景区</p>
+                <div class="spot-list">${d.sights.map(s => `<span class="spot${s.must ? ' must' : ''}">${s.name}</span>`).join('')}</div>
+                <p class="section-label">当晚住宿</p>
+                <div class="hotel-card">
+                  <strong>${d.hotel.url ? `<a href="${d.hotel.url}" target="_blank" rel="noopener">${d.hotel.name} ↗</a>` : d.hotel.name}</strong>
+                  <span>${d.hotel.note}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>`).join('');
+
+      function scrollToRoadbook(day) {
+        document.getElementById(day ? `road-day-${day}` : 'roadbook').scrollIntoView({behavior:'smooth', block:'start'});
+      }
+
+      document.getElementById('openRoadbook').addEventListener('click', () => scrollToRoadbook());
+
+      function renderDetail(d) {
+        detail.innerHTML = `
+          <div class="detail-date">DAY ${String(d.day).padStart(2,'0')} · ${d.date}</div>
+          <h3 class="detail-title">${d.title}</h3>
+          <div class="meta-row">
+            <div class="meta"><strong>${d.km}</strong><span>里程</span></div>
+            <div class="meta"><strong>${d.max}</strong><span>最高海拔</span></div>
+            <div class="meta"><strong class="risk-${d.riskClass}">${d.risk}</strong><span>驾驶风险</span></div>
+          </div>
+          <ul class="schedule">${d.schedule.map(x => `<li><time>${x[0]}</time><span>${x[1]}</span></li>`).join('')}</ul>
+          <div class="drive-note"><strong>驾驶：</strong>${d.driver}</div>
+          <div class="brief-warning">${d.warning}</div>
+          <button class="detail-jump" type="button" id="detailJump">查看当天逐段路书 ↓</button>`;
+        document.getElementById('detailJump').addEventListener('click', () => scrollToRoadbook(d.day));
+      }
+
+      if (!window.L) {
+        fallback.style.display = 'grid';
+        renderDetail(days[0]);
+        return;
+      }
+
+      const map = L.map('map', {zoomControl:false, preferCanvas:true}).setView([38.25,98.4], 6);
+      L.control.zoom({position:'topright'}).addTo(map);
+      let baseMapFallbackUsed = false;
+      const chinaBaseMap = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?style=7&x={x}&y={y}&z={z}', {
+        subdomains: '1234',
+        maxZoom: 18,
+        attribution: '&copy; <a href="https://www.amap.com/">高德地图</a> · 国内中文底图'
+      }).addTo(map);
+      chinaBaseMap.on('tileerror', () => {
+        if (baseMapFallbackUsed) return;
+        baseMapFallbackUsed = true;
+        map.removeLayer(chinaBaseMap);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · 备用底图'
+        }).addTo(map).bringToBack();
+      });
+
+      const routeLayer = L.layerGroup().addTo(map);
+      const stayLayer = L.layerGroup().addTo(map);
+      const hazardLayer = L.layerGroup().addTo(map);
+      const altitudeLayer = L.layerGroup();
+      const attractionLayer = L.layerGroup().addTo(map);
+      const distanceLayer = L.layerGroup().addTo(map);
+      const routeLines = new Map();
+      const stayMarkers = new Map();
+      const hazardMarkers = [];
+      const attractionMarkers = [];
+      const segmentMarkers = [];
+      const summaryDistanceMarkers = [];
+
+      function dayIcon(day, active=false) {
+        return L.divIcon({className:'day-marker', html:`<div class="day-pin${active?' active':''}">D${day}</div>`, iconSize:[31,31], iconAnchor:[15,15]});
+      }
+
+      days.forEach(d => {
+        const casing = L.polyline(d.route, {color:'#fffdf7', weight:8, opacity:.82, lineCap:'round', lineJoin:'round', interactive:false}).addTo(routeLayer);
+        const line = L.polyline(d.route, {color:'#d65d31', weight:4, opacity:.78, lineCap:'round', lineJoin:'round'}).addTo(routeLayer);
+        routeLines.set(d.day, {casing, line});
+        const marker = L.marker(d.stay, {icon:dayIcon(d.day)}).addTo(stayLayer);
+        marker.bindPopup(`<div class="popup-title">D${d.day} · ${d.title}</div><div class="popup-meta">住宿/终点：${d.sleep}</div>`);
+        marker.on('click', () => selectDay(d.day, false));
+        stayMarkers.set(d.day, marker);
+      });
+
+      hazards.forEach(h => {
+        const icon = L.divIcon({className:'hazard-marker', html:'<div class="hazard-pin"></div>', iconSize:[22,20], iconAnchor:[11,19]});
+        const marker = L.marker(h.pos, {icon}).bindPopup(`<div class="popup-title">${h.name} · ${h.alt}</div><div class="popup-meta">${h.note}</div>`).addTo(hazardLayer);
+        hazardMarkers.push({day:h.day, marker});
+      });
+
+      altitudes.forEach(a => {
+        const icon = L.divIcon({className:'alt-marker', html:`<div class="alt-pin">${a.name} ${a.alt}</div>`, iconAnchor:[32,-8]});
+        L.marker(a.pos, {icon, interactive:false}).addTo(altitudeLayer);
+      });
+
+      attractions.forEach(a => {
+        const icon = L.divIcon({className:'attraction-marker', html:`<div class="attraction-pin">${a.name}</div>`, iconSize:[120,24], iconAnchor:a.anchor || [8,12]});
+        const marker = L.marker(a.pos, {icon, interactive:false, zIndexOffset:350}).addTo(attractionLayer);
+        attractionMarkers.push({day:a.day, key:Boolean(a.key), marker});
+      });
+
+      segmentLabels.forEach(s => {
+        const icon = L.divIcon({className:'distance-marker', html:`<div class="distance-pin">${s.label}</div>`, iconSize:[52,18], iconAnchor:[26,9]});
+        const marker = L.marker(s.pos, {icon, interactive:false, opacity:0, zIndexOffset:250}).addTo(distanceLayer);
+        segmentMarkers.push({day:s.day, marker});
+      });
+
+      dayDistanceLabels.forEach(s => {
+        const icon = L.divIcon({className:'distance-marker', html:`<div class="distance-pin">${s.label}</div>`, iconSize:[74,18], iconAnchor:[37,9]});
+        const marker = L.marker(s.pos, {icon, interactive:false, zIndexOffset:250}).addTo(distanceLayer);
+        summaryDistanceMarkers.push({day:s.day, marker});
+      });
+
+      const allBounds = L.latLngBounds(days.flatMap(d => d.route));
+
+      function selectDay(day, fit=true) {
+        const d = days.find(x => x.day === day);
+        renderDetail(d);
+        document.querySelectorAll('.day-tab').forEach((btn,i) => btn.classList.toggle('active', i === day-1));
+        routeLines.forEach((route,key) => {
+          route.casing.setStyle(key === day ? {weight:12, opacity:1} : {weight:7, opacity:.38});
+          route.line.setStyle(key === day ? {weight:7, opacity:1, color:'#d65d31'} : {weight:3, opacity:.24, color:'#737b76'});
+        });
+        stayMarkers.forEach((marker,key) => {
+          marker.setIcon(dayIcon(key, key===day));
+          marker.setOpacity(key === day ? 1 : .28);
+        });
+        hazardMarkers.forEach(x => x.marker.setOpacity(x.day === day ? 1 : 0));
+        attractionMarkers.forEach(x => x.marker.setOpacity(x.day === day ? 1 : 0));
+        segmentMarkers.forEach(x => x.marker.setOpacity(x.day === day ? 1 : 0));
+        summaryDistanceMarkers.forEach(x => x.marker.setOpacity(0));
+        if (fit) {
+          const mobile = window.matchMedia('(max-width: 850px)').matches;
+          map.fitBounds(L.latLngBounds(d.route), mobile
+            ? {paddingTopLeft:[28,90], paddingBottomRight:[28,28], maxZoom:8}
+            : {paddingTopLeft:[410,110], paddingBottomRight:[80,70], maxZoom:8});
+        }
+      }
+
+      function showAll() {
+        document.querySelectorAll('.day-tab').forEach(btn => btn.classList.remove('active'));
+        routeLines.forEach(route => {
+          route.casing.setStyle({weight:9, opacity:.86});
+          route.line.setStyle({weight:4, opacity:.82, color:'#d65d31'});
+        });
+        stayMarkers.forEach((marker,key) => {
+          marker.setIcon(dayIcon(key));
+          marker.setOpacity(1);
+        });
+        hazardMarkers.forEach(x => x.marker.setOpacity(1));
+        const compactMap = window.matchMedia('(max-width: 850px)').matches;
+        attractionMarkers.forEach(x => x.marker.setOpacity(!compactMap || x.key ? 1 : 0));
+        segmentMarkers.forEach(x => x.marker.setOpacity(0));
+        summaryDistanceMarkers.forEach(x => x.marker.setOpacity(1));
+        map.fitBounds(allBounds, {paddingTopLeft:[410,110], paddingBottomRight:[80,70]});
+        detail.innerHTML = `
+          <div class="detail-date">7 DAYS / 6 NIGHTS · 2026.08.30—09.05</div>
+          <h3 class="detail-title">西宁出发，西宁闭环</h3>
+          <div class="meta-row">
+            <div class="meta"><strong>≈2,300km</strong><span>租车里程</span></div>
+            <div class="meta"><strong>≈3,800m</strong><span>最高点</span></div>
+            <div class="meta"><strong class="risk-high">D2/3/5/6</strong><span>长途日</span></div>
+          </div>
+          <ul class="schedule">
+            <li><time>D1–D2</time><span>西宁—青海湖—茶卡—德令哈</span></li>
+            <li><time>D3–D4</time><span>翡翠湖—当金山—敦煌，连住两晚</span></li>
+            <li><time>D5–D6</time><span>七彩丹霞—肃南—祁连—西宁</span></li>
+            <li><time>D7</time><span>塔尔寺或市区后还车返程</span></li>
+          </ul>
+          <div class="drive-note"><strong>路线：</strong>D2住德令哈、D3到敦煌；D6按肃南—祁连—峨堡官方绕行，不走封闭的老G227。</div>
+          <div class="brief-warning">不安排日月山、黑独山、水上雅丹、G315停车点、嘉峪关关城和门源油菜花。</div>
+          <button class="detail-jump" type="button" id="detailJump">展开7天6晚逐段路书 ↓</button>`;
+        document.getElementById('detailJump').addEventListener('click', () => scrollToRoadbook());
+      }
+
+      document.getElementById('fitRoute').addEventListener('click', showAll);
+      document.getElementById('showAll').addEventListener('click', showAll);
+      document.getElementById('attractionToggle').addEventListener('change', e => e.target.checked ? attractionLayer.addTo(map) : map.removeLayer(attractionLayer));
+      document.getElementById('distanceToggle').addEventListener('change', e => e.target.checked ? distanceLayer.addTo(map) : map.removeLayer(distanceLayer));
+      document.getElementById('hazardToggle').addEventListener('change', e => e.target.checked ? hazardLayer.addTo(map) : map.removeLayer(hazardLayer));
+      document.getElementById('altToggle').addEventListener('change', e => e.target.checked ? altitudeLayer.addTo(map) : map.removeLayer(altitudeLayer));
+
+      showAll();
+      if (window.matchMedia('(max-width: 850px)').matches) map.fitBounds(allBounds, {padding:[28,28]});
+      setTimeout(() => map.invalidateSize(), 120);
+    })();
+  </script>
+</body>
+</html>
